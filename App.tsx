@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, UserRole, DesignCost, Payment, QuickButton } from './types';
 import { storageService } from './services/storageService';
 import Dashboard from './components/Dashboard';
@@ -15,7 +15,6 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [costs, setCosts] = useState<DesignCost[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -29,7 +28,7 @@ const App: React.FC = () => {
     extraCharges: '',
     description: '',
     type: 'Design',
-    method: 'GPay',
+    method: 'Sampath Bank',
     saveAsPreset: false
   });
 
@@ -47,7 +46,6 @@ const App: React.FC = () => {
       setCosts(c);
       setPayments(p);
       setManagedQuickButtons(storageService.getQuickButtons());
-      setLastSync(new Date());
     } catch (err) {
       console.error("Fetch failed", err);
     } finally {
@@ -70,6 +68,8 @@ const App: React.FC = () => {
       setCurrentUser({ role, name: 'Sanjaya', email: 'sanjaya@designer.com' });
     } else if (role === UserRole.RAVI && password === PASSWORDS.RAVI) {
       setCurrentUser({ role, name: 'Ravi', email: 'ravi2025@client.com' });
+      // Set default payment method for Ravi
+      setFormData(prev => ({ ...prev, method: 'Sampath Bank' }));
     } else {
       alert("Invalid Password");
     }
@@ -97,24 +97,25 @@ const App: React.FC = () => {
     const extraNum = parseFloat(formData.extraCharges) || 0;
     if (isNaN(amountNum) || amountNum <= 0) return alert("Enter valid amount");
 
+    // Handle optional description defaults
+    const finalDescription = formData.description.trim() || (currentUser.role === UserRole.SANJAYA ? "Design Work" : "Payment Settlement");
+
     if (currentUser.role === UserRole.SANJAYA) {
       const newCost: DesignCost = {
         id: crypto.randomUUID(),
         date: new Date().toISOString(),
         amount: amountNum,
         extraCharges: extraNum,
-        description: formData.description,
+        description: finalDescription,
         type: formData.type,
         addedBy: currentUser.name
       };
       await storageService.saveCost(newCost, currentUser.email);
 
-      // Save as preset if requested
-      if (formData.saveAsPreset) {
-        // Check if a similar preset already exists to avoid duplicates
-        const exists = managedQuickButtons.some(b => b.label.toLowerCase() === formData.description.toLowerCase() && b.amount === amountNum);
+      if (formData.saveAsPreset && formData.description.trim()) {
+        const exists = managedQuickButtons.some(b => b.label.toLowerCase() === finalDescription.toLowerCase() && b.amount === amountNum);
         if (!exists) {
-          addQuickButton(formData.description, amountNum);
+          addQuickButton(finalDescription, amountNum);
         }
       }
     } else {
@@ -122,7 +123,7 @@ const App: React.FC = () => {
         id: crypto.randomUUID(),
         date: new Date().toISOString(),
         amount: amountNum,
-        note: formData.description,
+        note: finalDescription,
         method: formData.method,
         addedBy: currentUser.name
       };
@@ -130,12 +131,12 @@ const App: React.FC = () => {
     }
 
     setIsAddModalOpen(false);
-    setFormData({ amount: '', extraCharges: '', description: '', type: 'Design', method: 'GPay', saveAsPreset: false });
+    setFormData({ amount: '', extraCharges: '', description: '', type: 'Design', method: 'Sampath Bank', saveAsPreset: false });
     setTimeout(loadData, 500); 
   };
 
   const handleDelete = async (id: string, type: 'COST' | 'PAYMENT') => {
-    if (!window.confirm("Delete this entry?")) return;
+    if (!window.confirm("Delete entry?")) return;
     await storageService.deleteEntry(id, type);
     setTimeout(loadData, 500);
   };
@@ -146,7 +147,7 @@ const App: React.FC = () => {
       extraCharges: '',
       description: btn.label,
       type: btn.type,
-      method: 'GPay',
+      method: 'Sampath Bank',
       saveAsPreset: false
     });
     setIsAddModalOpen(true);
@@ -159,7 +160,7 @@ const App: React.FC = () => {
   };
 
   const deleteQuickButton = (id: string) => {
-    if (!window.confirm("Delete this preset?")) return;
+    if (!window.confirm("Delete preset?")) return;
     const updated = managedQuickButtons.filter(b => b.id !== id);
     setManagedQuickButtons(updated);
     storageService.saveQuickButtons(updated);
@@ -169,34 +170,34 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl overflow-hidden border border-slate-200">
-          <div className="p-12 text-center">
-            <div className="w-24 h-24 bg-indigo-600 rounded-[32px] flex items-center justify-center mx-auto mb-10 shadow-xl rotate-6 transition-transform hover:rotate-12">
-              <span className="text-white text-4xl font-black">SR</span>
+        <div className="max-w-xs w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+          <div className="p-8 text-center">
+            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3">
+              <span className="text-white text-xl font-black">SR</span>
             </div>
-            <h1 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Identity Check</h1>
-            <p className="text-slate-500 mb-10 font-medium">Select your portal to continue</p>
+            <h1 className="text-lg font-black text-slate-900 mb-1">Identity Check</h1>
+            <p className="text-slate-500 mb-6 text-[10px] font-medium uppercase tracking-widest">Select Account</p>
             
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
                 <button 
                   type="button"
                   onClick={() => setLoginState({ role: UserRole.SANJAYA, password: '' })}
-                  className={`py-5 rounded-3xl border-2 transition-all font-bold ${loginState.role === UserRole.SANJAYA ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-400 bg-slate-50'}`}
+                  className={`py-3 rounded-xl border-2 transition-all text-xs font-bold ${loginState.role === UserRole.SANJAYA ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-100 text-slate-400'}`}
                 >
                   Sanjaya
                 </button>
                 <button 
                   type="button"
                   onClick={() => setLoginState({ role: UserRole.RAVI, password: '' })}
-                  className={`py-5 rounded-3xl border-2 transition-all font-bold ${loginState.role === UserRole.RAVI ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400 bg-slate-50'}`}
+                  className={`py-3 rounded-xl border-2 transition-all text-xs font-bold ${loginState.role === UserRole.RAVI ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}
                 >
                   Ravi
                 </button>
               </div>
 
               {loginState.role !== UserRole.NONE && (
-                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="animate-in fade-in slide-in-from-top-2">
                   <input 
                     type="password"
                     required
@@ -204,9 +205,9 @@ const App: React.FC = () => {
                     placeholder="Enter Secret Key"
                     value={loginState.password}
                     onChange={(e) => setLoginState({ ...loginState, password: e.target.value })}
-                    className="w-full px-8 py-5 bg-slate-100 border-none rounded-[24px] outline-none focus:ring-4 focus:ring-indigo-500/20 text-center font-bold text-xl tracking-widest"
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-lg"
                   />
-                  <button type="submit" className={`w-full mt-6 py-5 text-white font-black rounded-[24px] shadow-xl transition-all active:scale-95 ${loginState.role === UserRole.SANJAYA ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>
+                  <button type="submit" className={`w-full mt-4 py-3 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 ${loginState.role === UserRole.SANJAYA ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
                     Open Workspace
                   </button>
                 </div>
@@ -221,199 +222,129 @@ const App: React.FC = () => {
   const roleColor = currentUser.role === UserRole.SANJAYA ? 'emerald' : 'indigo';
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-6 py-4 shadow-sm">
+    <div className="min-h-screen bg-slate-50 pb-20">
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 px-4 py-2 shadow-sm">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 bg-${roleColor}-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg border-4 border-white`}>
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 bg-${roleColor}-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md`}>
               {currentUser.name[0]}
             </div>
-            <div>
-              <p className="text-base font-black text-slate-900">{currentUser.name}</p>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full bg-${roleColor}-500 animate-pulse`}></div>
-                <p className="text-[11px] uppercase tracking-widest text-slate-400 font-black">
-                  {currentUser.role === UserRole.SANJAYA ? 'Creative Director' : 'Project Sponsor'}
-                </p>
-              </div>
+            <div className="leading-tight">
+              <p className="text-xs font-black text-slate-900">{currentUser.name}</p>
+              <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                {currentUser.role === UserRole.SANJAYA ? 'Creative Lead' : 'Project Sponsor'}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={loadData} 
-              disabled={isSyncing}
-              className={`p-3 rounded-2xl hover:bg-slate-100 transition-colors ${isSyncing ? 'animate-spin text-indigo-600' : 'text-slate-400'}`}
-              title="Cloud Sync"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center gap-1">
+            <button onClick={loadData} disabled={isSyncing} className={`p-2 rounded-lg hover:bg-slate-100 ${isSyncing ? 'animate-spin text-indigo-600' : 'text-slate-400'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
-            <button onClick={() => setIsSettingsOpen(true)} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-2xl transition-colors">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
+            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
             </button>
-            <button onClick={() => setCurrentUser(null)} className="ml-2 text-[11px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-widest border-2 border-slate-100 px-5 py-2.5 rounded-2xl hover:border-rose-100 transition-all">Exit</button>
+            <button onClick={() => setCurrentUser(null)} className="ml-1 text-[8px] font-black text-slate-400 uppercase border border-slate-100 px-2 py-1 rounded-md">Log Out</button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6 space-y-10">
+      <main className="max-w-4xl mx-auto p-4 space-y-4">
         <Dashboard costs={costs} payments={payments} userRole={currentUser.role} onLogPaymentClick={() => setIsAddModalOpen(true)} />
 
         {currentUser.role === UserRole.SANJAYA && (
-          <section className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8">
-              <button 
-                onClick={() => setIsQuickBillManagerOpen(true)}
-                className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-5 py-2.5 rounded-full border border-emerald-100 shadow-sm transition-all active:scale-95"
-              >
-                Config Presets
+          <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <Icons.Design /> Quick Bill Presets
+              </h3>
+              <button onClick={() => setIsQuickBillManagerOpen(true)} className="text-[9px] font-black text-emerald-600 uppercase bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                Manage
               </button>
             </div>
-            <h3 className="text-sm font-black uppercase tracking-[0.25em] text-slate-400 mb-10 flex items-center gap-4">
-               <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-[14px] flex items-center justify-center shadow-inner">
-                 <Icons.Design />
-               </div>
-               Quick Bill Launchpad
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
               {managedQuickButtons.map((btn) => (
                 <button 
                   key={btn.id} 
                   onClick={() => handleQuickAddClick(btn)} 
-                  className="bg-slate-50 border border-slate-200 p-6 rounded-[24px] hover:border-emerald-500 hover:bg-white hover:shadow-2xl hover:shadow-emerald-500/10 transition-all text-left active:scale-95 group"
+                  className="bg-slate-50 border border-slate-100 p-3 rounded-xl hover:border-emerald-500 hover:bg-white transition-all text-left active:scale-95 group"
                 >
-                  <p className="text-[12px] font-bold text-slate-500 mb-3 group-hover:text-emerald-600 transition-colors line-clamp-1">{btn.label}</p>
-                  <p className="text-2xl font-black text-slate-900 leading-none">Rs.{btn.amount.toLocaleString()}</p>
+                  <p className="text-[10px] font-bold text-slate-500 mb-1 truncate">{btn.label}</p>
+                  <p className="text-sm font-black text-slate-900 leading-none">Rs.{btn.amount}</p>
                 </button>
               ))}
-              <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="border-2 border-dashed border-slate-200 rounded-[24px] flex flex-col items-center justify-center p-6 text-slate-400 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all group"
-              >
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                  <Icons.Plus />
-                </div>
-                <span className="text-[11px] font-black mt-3 uppercase tracking-widest">New Custom</span>
+              <button onClick={() => setIsAddModalOpen(true)} className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-3 text-slate-400 hover:border-emerald-500 transition-all">
+                <Icons.Plus />
+                <span className="text-[8px] font-black mt-1 uppercase">Custom</span>
               </button>
             </div>
           </section>
         )}
 
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-3">
-            <h3 className="text-base font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-3">
-              <div className="w-2 h-8 bg-indigo-500 rounded-full shadow-lg shadow-indigo-200"></div>
-              Ledger Transactions
-            </h3>
-            {isSyncing && <span className="text-[11px] font-black text-indigo-500 uppercase animate-pulse flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-              Syncing Cloud...
-            </span>}
-          </div>
+        <div className="space-y-2">
           <HistoryList costs={costs} payments={payments} onDelete={handleDelete} currentUser={currentUser} />
         </div>
       </main>
 
-      {/* Floating Plus for Ravi */}
       {currentUser.role === UserRole.RAVI && (
-        <div className="fixed bottom-12 right-12 z-40 group">
-          <button onClick={() => setIsAddModalOpen(true)} className={`w-20 h-20 rounded-[28px] bg-indigo-600 text-white shadow-2xl shadow-indigo-600/40 hover:scale-110 transition-all flex items-center justify-center active:rotate-90 hover:rotate-12`}>
+        <div className="fixed bottom-6 right-6 z-40">
+          <button onClick={() => setIsAddModalOpen(true)} className="w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-xl flex items-center justify-center active:scale-90 transition-transform">
             <Icons.Plus />
           </button>
         </div>
       )}
 
+      {/* Quick Bill Manager Modal */}
       {isQuickBillManagerOpen && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl overflow-hidden p-10 md:p-12">
-            <div className="flex justify-between items-center mb-12">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900">Preset Architect</h3>
-                <p className="text-slate-500 text-sm font-medium mt-2">Manage your most frequent billing templates</p>
-              </div>
-              <button onClick={() => { setIsQuickBillManagerOpen(false); setEditingPreset(null); }} className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all">✕</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden p-6 md:p-8 transition-all">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-black text-slate-900">Preset Architect</h3>
+              <button onClick={() => { setIsQuickBillManagerOpen(false); setEditingPreset(null); }} className="p-2 bg-slate-100 rounded-full text-slate-400">✕</button>
             </div>
             
-            <div className="space-y-10">
-              <div className="max-h-[350px] overflow-y-auto space-y-4 pr-3 custom-scrollbar">
-                {managedQuickButtons.length === 0 && <p className="text-center py-12 text-slate-400 font-medium italic border-2 border-dashed border-slate-100 rounded-3xl">No billing presets architected yet.</p>}
+            <div className="space-y-6">
+              <div className="max-h-[250px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {managedQuickButtons.length === 0 && <p className="text-center py-6 text-slate-400 text-xs italic">No presets available.</p>}
                 {managedQuickButtons.map((btn) => (
-                  <div key={btn.id} className={`flex items-center justify-between p-6 rounded-[24px] border transition-all group ${editingPreset?.id === btn.id ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100 hover:border-emerald-200'}`}>
-                    <div>
-                      <p className="font-black text-slate-800 text-lg">{btn.label}</p>
-                      <p className="text-base font-black text-emerald-600">Rs.{btn.amount.toLocaleString()}</p>
+                  <div key={btn.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${editingPreset?.id === btn.id ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="overflow-hidden">
+                      <p className="font-bold text-slate-800 text-sm truncate pr-2">{btn.label}</p>
+                      <p className="text-xs font-black text-emerald-600">Rs.{btn.amount}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setEditingPreset(btn)}
-                        className={`w-10 h-10 flex items-center justify-center bg-white shadow-sm rounded-xl transition-all hover:scale-110 ${editingPreset?.id === btn.id ? 'text-emerald-600 border border-emerald-200' : 'text-slate-300 hover:text-emerald-500'}`}
-                        title="Edit preset"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => setEditingPreset(btn)} className="p-2 text-slate-400 hover:text-emerald-600 bg-white rounded-lg shadow-sm">
+                        <Icons.Design />
                       </button>
-                      <button 
-                        onClick={() => deleteQuickButton(btn.id)}
-                        className="w-10 h-10 flex items-center justify-center bg-white text-slate-300 hover:text-rose-500 shadow-sm rounded-xl transition-all hover:scale-110"
-                        title="Delete preset"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                      <button onClick={() => deleteQuickButton(btn.id)} className="p-2 text-slate-400 hover:text-rose-500 bg-white rounded-lg shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className={`pt-8 border-t-2 border-slate-50 transition-all ${editingPreset ? 'bg-emerald-50/30 -mx-6 px-6 pb-6 rounded-b-[48px]' : ''}`}>
-                <div className="flex items-center justify-between mb-6">
-                  <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
-                    {editingPreset ? 'Update Existing Preset' : 'Forge New Preset'}
-                  </p>
-                  {editingPreset && (
-                    <button onClick={() => setEditingPreset(null)} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline">
-                      Cancel Editing
-                    </button>
-                  )}
-                </div>
+              <div className="pt-4 border-t border-slate-100">
                 <form 
-                  key={editingPreset?.id || 'new'}
                   onSubmit={(e) => {
                     e.preventDefault();
                     const f = e.currentTarget;
                     const label = (f.elements.namedItem('btn-label') as HTMLInputElement).value;
                     const amount = parseFloat((f.elements.namedItem('btn-amount') as HTMLInputElement).value);
                     if (label && amount > 0) {
-                      if (editingPreset) {
-                        updateQuickButton(editingPreset.id, label, amount);
-                      } else {
-                        addQuickButton(label, amount);
-                      }
+                      editingPreset ? updateQuickButton(editingPreset.id, label, amount) : addQuickButton(label, amount);
                       f.reset();
                     }
                   }}
-                  className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                  className="space-y-3"
                 >
-                  <input 
-                    name="btn-label" 
-                    required 
-                    defaultValue={editingPreset?.label || ''}
-                    placeholder="Project Name" 
-                    className="md:col-span-2 px-6 py-5 bg-white border border-slate-100 rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg shadow-sm" 
-                  />
-                  <input 
-                    name="btn-amount" 
-                    required 
-                    type="number" 
-                    defaultValue={editingPreset?.amount || ''}
-                    placeholder="Cost" 
-                    className="px-6 py-5 bg-white border border-slate-100 rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg shadow-sm" 
-                  />
-                  <button type="submit" className={`md:col-span-3 py-5 text-white font-black rounded-[20px] shadow-2xl transition-all active:scale-95 text-lg ${editingPreset ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}>
-                    {editingPreset ? 'Update Preset Details' : 'Forge into Presets'}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input name="btn-label" required defaultValue={editingPreset?.label || ''} placeholder="Preset Name" className="px-4 py-3 bg-slate-50 rounded-xl text-sm font-bold outline-none border border-slate-100" />
+                    <input name="btn-amount" required type="number" defaultValue={editingPreset?.amount || ''} placeholder="Price" className="px-4 py-3 bg-slate-50 rounded-xl text-sm font-bold outline-none border border-slate-100" />
+                  </div>
+                  <button type="submit" className="w-full py-3 bg-emerald-600 text-white font-black rounded-xl shadow-md active:scale-95 transition-all text-sm">
+                    {editingPreset ? 'Update Preset' : 'Add to Presets'}
                   </button>
                 </form>
               </div>
@@ -422,80 +353,95 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Cloud Link Modal */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-lg rounded-[48px] shadow-2xl overflow-hidden p-12">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-slate-900">Cloud Link</h3>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-black text-slate-900">Cloud Link</h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400">✕</button>
             </div>
-            <div className="space-y-10">
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">GAS Web App Webhook</label>
-                <textarea 
-                  rows={4}
-                  value={gasUrl} 
-                  onChange={(e) => setGasUrl(e.target.value)} 
-                  className="w-full px-6 py-6 bg-slate-100 border-none rounded-[24px] font-mono text-xs focus:ring-4 focus:ring-indigo-500/10 outline-none resize-none leading-relaxed" 
-                  placeholder="https://script.google.com/macros/s/.../exec" 
-                />
-              </div>
-              <div className="p-8 bg-indigo-50/50 rounded-[32px] border-2 border-indigo-100/50">
-                <p className="text-xs text-indigo-900 leading-loose font-bold italic">
-                  Tip: Ensure "Execute as: Me" and "Access: Anyone" are set in your Google Script deployment for the ledger to sync across devices.
-                </p>
-              </div>
-              <button onClick={saveSettings} className="w-full py-6 bg-indigo-600 text-white font-black rounded-[24px] hover:bg-indigo-700 shadow-2xl shadow-indigo-600/30 transition-all active:scale-95 text-lg">Establish Connection</button>
+            <div className="space-y-4">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">GAS Webhook URL</label>
+              <textarea 
+                rows={3}
+                value={gasUrl} 
+                onChange={(e) => setGasUrl(e.target.value)} 
+                className="w-full px-4 py-4 bg-slate-50 border-none rounded-xl font-mono text-[10px] focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
+                placeholder="https://script.google.com/..." 
+              />
+              <button onClick={saveSettings} className="w-full py-3 bg-indigo-600 text-white font-black rounded-xl shadow-lg transition-all active:scale-95">Establish Link</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Main Entry Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-[48px] shadow-2xl overflow-hidden p-12">
-            <div className="flex justify-between items-center mb-10">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900">{currentUser.role === UserRole.SANJAYA ? 'Design Billing' : 'Log Settlement'}</h3>
-                <p className="text-slate-500 text-sm font-medium mt-2">Update your project ledger</p>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">✕</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl p-6 md:p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                {currentUser.role === UserRole.SANJAYA ? 'Design Work Entry' : <><Icons.Wallet /> Pay</>}
+              </h3>
+              <button onClick={() => setIsAddModalOpen(false)} className="p-2 bg-slate-100 rounded-full text-slate-400">✕</button>
             </div>
-            <form onSubmit={handleAddEntry} className="space-y-8">
-              <div className="space-y-5">
+            <form onSubmit={handleAddEntry} className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Main Cost (Rs.)</label>
-                  <input autoFocus required type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full px-8 py-6 bg-slate-100 border-none rounded-[24px] text-3xl font-black outline-none focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-300" placeholder="0.00" />
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">
+                    {currentUser.role === UserRole.SANJAYA ? 'Base Cost (Rs.)' : 'Paid Amount (Rs.)'}
+                  </label>
+                  <input autoFocus required type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full px-4 py-3 bg-slate-50 rounded-xl text-xl font-black outline-none border border-slate-100" placeholder="0.00" />
                 </div>
+                
                 {currentUser.role === UserRole.SANJAYA && (
                   <div>
-                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Extra Charges (Rs.)</label>
-                    <input type="number" step="0.01" value={formData.extraCharges} onChange={(e) => setFormData({...formData, extraCharges: e.target.value})} className="w-full px-8 py-5 bg-slate-100 border-none rounded-[24px] text-xl font-black outline-none focus:ring-4 focus:ring-emerald-500/10 text-emerald-600 placeholder:text-slate-300" placeholder="0.00" />
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Extra Charges (Rs.)</label>
+                    <input type="number" step="0.01" value={formData.extraCharges} onChange={(e) => setFormData({...formData, extraCharges: e.target.value})} className="w-full px-4 py-3 bg-slate-50 rounded-xl text-base font-black outline-none border border-slate-100 text-emerald-600" placeholder="0.00" />
                   </div>
                 )}
+
+                {currentUser.role === UserRole.RAVI && (
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Payment Method</label>
+                    <select 
+                      value={formData.method} 
+                      onChange={(e) => setFormData({...formData, method: e.target.value})}
+                      className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold outline-none border border-slate-100 text-sm"
+                    >
+                      <option value="Sampath Bank">Sampath Bank</option>
+                      <option value="Other Banks">Other Banks</option>
+                      <option value="Cash">Cash</option>
+                    </select>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Reference / Service Details</label>
-                  <input required type="text" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-8 py-5 bg-slate-100 border-none rounded-[24px] font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 text-lg placeholder:text-slate-300" placeholder={currentUser.role === UserRole.SANJAYA ? "e.g. Logo Revision v2" : "GPay Settlement..."} />
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">
+                    Reference Note <span className="opacity-50">(Optional)</span>
+                  </label>
+                  <input type="text" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold outline-none border border-slate-100 text-sm" placeholder={currentUser.role === UserRole.SANJAYA ? "e.g. Logo Revision" : "e.g. Monthly Settlement"} />
                 </div>
               </div>
 
               {currentUser.role === UserRole.SANJAYA && (
-                <div className="flex items-center gap-4 bg-emerald-50/50 p-5 rounded-[24px] border border-emerald-100">
+                <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <input 
                     type="checkbox" 
                     id="saveAsPreset" 
                     checked={formData.saveAsPreset} 
                     onChange={(e) => setFormData({...formData, saveAsPreset: e.target.checked})}
-                    className="w-6 h-6 rounded-lg text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
                   />
-                  <label htmlFor="saveAsPreset" className="text-sm font-black text-emerald-800 cursor-pointer select-none">
-                    Remember this as a Quick Bill Preset?
+                  <label htmlFor="saveAsPreset" className="text-[10px] font-black text-emerald-800 uppercase tracking-tighter cursor-pointer">
+                    Save as quick bill preset?
                   </label>
                 </div>
               )}
               
-              <button type="submit" className={`w-full py-6 bg-${roleColor}-600 hover:bg-${roleColor}-700 text-white font-black rounded-[24px] shadow-2xl transition-all flex items-center justify-center gap-4 active:scale-95 shadow-${roleColor}-600/30 mt-6 text-xl`}>
-                <Icons.Plus /> Finalize Entry
+              <button type="submit" className={`w-full py-4 bg-${roleColor}-600 text-white font-black rounded-xl shadow-lg active:scale-95 mt-2 transition-all`}>
+                Finalize {currentUser.role === UserRole.SANJAYA ? 'Bill' : 'Payment'}
               </button>
             </form>
           </div>
@@ -503,10 +449,9 @@ const App: React.FC = () => {
       )}
       
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; border: 2px solid white; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
       `}</style>
     </div>
   );
