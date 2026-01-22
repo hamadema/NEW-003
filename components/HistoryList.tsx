@@ -68,10 +68,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ costs, payments, onDelete, cu
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className={`font-bold text-base ${item.itemType === 'COST' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {item.itemType === 'COST' ? '-' : '+'}₹{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {item.itemType === 'COST' ? '-' : '+'}Rs.{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </p>
                   {extraCharges > 0 && (
-                    <p className="text-[9px] text-slate-400 font-medium">Incl. ₹{extraCharges} extra</p>
+                    <p className="text-[9px] text-slate-400 font-medium">Incl. Rs.{extraCharges} extra</p>
                   )}
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">
                     {subLabel}

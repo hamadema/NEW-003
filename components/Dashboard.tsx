@@ -39,7 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ costs, payments, userRole, onLogP
             <h2 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.3em] mb-4">Project Treasury Status</h2>
             <div className="flex items-baseline gap-4">
               <span className={`text-6xl font-black tracking-tighter ${balance === 0 ? 'text-slate-900' : isRaviOwing ? 'text-rose-600' : 'text-emerald-600'}`}>
-                ₹{displayBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                Rs.{displayBalance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </span>
               <span className={`text-slate-500 font-black bg-${balance === 0 ? 'slate' : isRaviOwing ? 'rose' : 'emerald'}-50 px-5 py-2 rounded-full text-[11px] uppercase tracking-widest border border-slate-100`}>
                 {balance === 0 ? 'Settled' : isRaviOwing ? 'Pending' : 'Credit'}
@@ -76,13 +76,13 @@ const Dashboard: React.FC<DashboardProps> = ({ costs, payments, userRole, onLogP
         <div className="grid grid-cols-2 border-t border-slate-100 bg-slate-50/60 divide-x divide-slate-100">
           <div className="p-8 group hover:bg-white transition-colors">
             <p className="text-[11px] text-slate-400 uppercase font-black tracking-widest mb-2 group-hover:text-rose-500 transition-colors">Total Project Cost</p>
-            <p className="text-3xl font-black text-slate-900">₹{totalCosts.toLocaleString()}</p>
-            <p className="text-[10px] text-slate-400 mt-1 font-bold">₹{recentCosts.toLocaleString()} in last 30 days</p>
+            <p className="text-3xl font-black text-slate-900">Rs.{totalCosts.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold">Rs.{recentCosts.toLocaleString()} in last 30 days</p>
           </div>
           <div className="p-8 group hover:bg-white transition-colors">
             <p className="text-[11px] text-slate-400 uppercase font-black tracking-widest mb-2 group-hover:text-emerald-500 transition-colors">Total Recovered</p>
-            <p className="text-3xl font-black text-slate-900">₹{totalPaid.toLocaleString()}</p>
-            <p className="text-[10px] text-slate-400 mt-1 font-bold">₹{recentPayments.toLocaleString()} in last 30 days</p>
+            <p className="text-3xl font-black text-slate-900">Rs.{totalPaid.toLocaleString()}</p>
+            <p className="text-[10px] text-slate-400 mt-1 font-bold">Rs.{recentPayments.toLocaleString()} in last 30 days</p>
           </div>
         </div>
       </div>
@@ -100,9 +100,9 @@ const Dashboard: React.FC<DashboardProps> = ({ costs, payments, userRole, onLogP
             <p className="text-lg font-black text-slate-900 truncate">{latestWork ? latestWork.description : 'No work logged'}</p>
             <div className="flex items-center gap-2 mt-1">
               <p className="text-sm font-black text-emerald-600">
-                ₹{(Number(latestWork?.amount) || 0) + (Number(latestWork?.extraCharges) || 0)}
+                Rs.{(Number(latestWork?.amount) || 0) + (Number(latestWork?.extraCharges) || 0)}
               </p>
-              {latestWork?.extraCharges ? <span className="text-[10px] text-slate-400 font-bold px-2 py-0.5 bg-slate-50 rounded-full border border-slate-100">Incl. ₹{latestWork.extraCharges} extras</span> : ''}
+              {latestWork?.extraCharges ? <span className="text-[10px] text-slate-400 font-bold px-2 py-0.5 bg-slate-50 rounded-full border border-slate-100">Incl. Rs.{latestWork.extraCharges} extras</span> : ''}
             </div>
           </div>
         </div>
@@ -116,7 +116,7 @@ const Dashboard: React.FC<DashboardProps> = ({ costs, payments, userRole, onLogP
           <div className="overflow-hidden">
             <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Latest Settlement Event</p>
             <p className="text-lg font-black text-slate-900 truncate">{latestPayment ? (latestPayment.note || latestPayment.method) : 'Awaiting payment'}</p>
-            <p className="text-sm font-black text-indigo-600 mt-1">₹{latestPayment ? latestPayment.amount.toLocaleString() : '0'}</p>
+            <p className="text-sm font-black text-indigo-600 mt-1">Rs.{latestPayment ? latestPayment.amount.toLocaleString() : '0'}</p>
           </div>
         </div>
       </div>

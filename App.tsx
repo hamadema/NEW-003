@@ -34,6 +34,7 @@ const App: React.FC = () => {
   });
 
   const [managedQuickButtons, setManagedQuickButtons] = useState<QuickButton[]>([]);
+  const [editingPreset, setEditingPreset] = useState<QuickButton | null>(null);
 
   const loadData = useCallback(async () => {
     if (isSyncing) return;
@@ -79,6 +80,13 @@ const App: React.FC = () => {
     const updated = [...managedQuickButtons, newBtn];
     setManagedQuickButtons(updated);
     storageService.saveQuickButtons(updated);
+  };
+
+  const updateQuickButton = (id: string, label: string, amount: number) => {
+    const updated = managedQuickButtons.map(b => b.id === id ? { ...b, label, amount } : b);
+    setManagedQuickButtons(updated);
+    storageService.saveQuickButtons(updated);
+    setEditingPreset(null);
   };
 
   const handleAddEntry = async (e: React.FormEvent) => {
@@ -151,9 +159,11 @@ const App: React.FC = () => {
   };
 
   const deleteQuickButton = (id: string) => {
+    if (!window.confirm("Delete this preset?")) return;
     const updated = managedQuickButtons.filter(b => b.id !== id);
     setManagedQuickButtons(updated);
     storageService.saveQuickButtons(updated);
+    if (editingPreset?.id === id) setEditingPreset(null);
   };
 
   if (!currentUser) {
@@ -274,7 +284,7 @@ const App: React.FC = () => {
                   className="bg-slate-50 border border-slate-200 p-6 rounded-[24px] hover:border-emerald-500 hover:bg-white hover:shadow-2xl hover:shadow-emerald-500/10 transition-all text-left active:scale-95 group"
                 >
                   <p className="text-[12px] font-bold text-slate-500 mb-3 group-hover:text-emerald-600 transition-colors line-clamp-1">{btn.label}</p>
-                  <p className="text-2xl font-black text-slate-900 leading-none">₹{btn.amount.toLocaleString()}</p>
+                  <p className="text-2xl font-black text-slate-900 leading-none">Rs.{btn.amount.toLocaleString()}</p>
                 </button>
               ))}
               <button 
@@ -316,54 +326,95 @@ const App: React.FC = () => {
 
       {isQuickBillManagerOpen && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl overflow-hidden p-12">
+          <div className="bg-white w-full max-w-xl rounded-[48px] shadow-2xl overflow-hidden p-10 md:p-12">
             <div className="flex justify-between items-center mb-12">
               <div>
                 <h3 className="text-2xl font-black text-slate-900">Preset Architect</h3>
                 <p className="text-slate-500 text-sm font-medium mt-2">Manage your most frequent billing templates</p>
               </div>
-              <button onClick={() => setIsQuickBillManagerOpen(false)} className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all">✕</button>
+              <button onClick={() => { setIsQuickBillManagerOpen(false); setEditingPreset(null); }} className="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all">✕</button>
             </div>
             
             <div className="space-y-10">
               <div className="max-h-[350px] overflow-y-auto space-y-4 pr-3 custom-scrollbar">
                 {managedQuickButtons.length === 0 && <p className="text-center py-12 text-slate-400 font-medium italic border-2 border-dashed border-slate-100 rounded-3xl">No billing presets architected yet.</p>}
                 {managedQuickButtons.map((btn) => (
-                  <div key={btn.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-[24px] border border-slate-100 group hover:border-emerald-300 transition-all">
+                  <div key={btn.id} className={`flex items-center justify-between p-6 rounded-[24px] border transition-all group ${editingPreset?.id === btn.id ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-100 hover:border-emerald-200'}`}>
                     <div>
                       <p className="font-black text-slate-800 text-lg">{btn.label}</p>
-                      <p className="text-base font-black text-emerald-600">₹{btn.amount.toLocaleString()}</p>
+                      <p className="text-base font-black text-emerald-600">Rs.{btn.amount.toLocaleString()}</p>
                     </div>
-                    <button 
-                      onClick={() => deleteQuickButton(btn.id)}
-                      className="w-10 h-10 flex items-center justify-center bg-white text-slate-300 hover:text-rose-500 shadow-sm rounded-xl transition-all hover:scale-110"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setEditingPreset(btn)}
+                        className={`w-10 h-10 flex items-center justify-center bg-white shadow-sm rounded-xl transition-all hover:scale-110 ${editingPreset?.id === btn.id ? 'text-emerald-600 border border-emerald-200' : 'text-slate-300 hover:text-emerald-500'}`}
+                        title="Edit preset"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={() => deleteQuickButton(btn.id)}
+                        className="w-10 h-10 flex items-center justify-center bg-white text-slate-300 hover:text-rose-500 shadow-sm rounded-xl transition-all hover:scale-110"
+                        title="Delete preset"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="pt-8 border-t-2 border-slate-50">
-                <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400 mb-6">Forge New Preset</p>
+              <div className={`pt-8 border-t-2 border-slate-50 transition-all ${editingPreset ? 'bg-emerald-50/30 -mx-6 px-6 pb-6 rounded-b-[48px]' : ''}`}>
+                <div className="flex items-center justify-between mb-6">
+                  <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
+                    {editingPreset ? 'Update Existing Preset' : 'Forge New Preset'}
+                  </p>
+                  {editingPreset && (
+                    <button onClick={() => setEditingPreset(null)} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline">
+                      Cancel Editing
+                    </button>
+                  )}
+                </div>
                 <form 
+                  key={editingPreset?.id || 'new'}
                   onSubmit={(e) => {
                     e.preventDefault();
                     const f = e.currentTarget;
                     const label = (f.elements.namedItem('btn-label') as HTMLInputElement).value;
                     const amount = parseFloat((f.elements.namedItem('btn-amount') as HTMLInputElement).value);
                     if (label && amount > 0) {
-                      addQuickButton(label, amount);
+                      if (editingPreset) {
+                        updateQuickButton(editingPreset.id, label, amount);
+                      } else {
+                        addQuickButton(label, amount);
+                      }
                       f.reset();
                     }
                   }}
                   className="grid grid-cols-1 md:grid-cols-3 gap-4"
                 >
-                  <input name="btn-label" required placeholder="Project Name" className="md:col-span-2 px-6 py-5 bg-slate-100 border-none rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg" />
-                  <input name="btn-amount" required type="number" placeholder="Cost" className="px-6 py-5 bg-slate-100 border-none rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg" />
-                  <button type="submit" className="md:col-span-3 py-5 bg-emerald-600 text-white font-black rounded-[20px] shadow-2xl shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-95 text-lg">Add to Presets</button>
+                  <input 
+                    name="btn-label" 
+                    required 
+                    defaultValue={editingPreset?.label || ''}
+                    placeholder="Project Name" 
+                    className="md:col-span-2 px-6 py-5 bg-white border border-slate-100 rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg shadow-sm" 
+                  />
+                  <input 
+                    name="btn-amount" 
+                    required 
+                    type="number" 
+                    defaultValue={editingPreset?.amount || ''}
+                    placeholder="Cost" 
+                    className="px-6 py-5 bg-white border border-slate-100 rounded-[20px] font-bold outline-none focus:ring-4 focus:ring-emerald-500/10 text-lg shadow-sm" 
+                  />
+                  <button type="submit" className={`md:col-span-3 py-5 text-white font-black rounded-[20px] shadow-2xl transition-all active:scale-95 text-lg ${editingPreset ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'}`}>
+                    {editingPreset ? 'Update Preset Details' : 'Forge into Presets'}
+                  </button>
                 </form>
               </div>
             </div>
@@ -413,12 +464,12 @@ const App: React.FC = () => {
             <form onSubmit={handleAddEntry} className="space-y-8">
               <div className="space-y-5">
                 <div>
-                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Main Cost (₹)</label>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Main Cost (Rs.)</label>
                   <input autoFocus required type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full px-8 py-6 bg-slate-100 border-none rounded-[24px] text-3xl font-black outline-none focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-300" placeholder="0.00" />
                 </div>
                 {currentUser.role === UserRole.SANJAYA && (
                   <div>
-                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Extra Charges (₹)</label>
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Extra Charges (Rs.)</label>
                     <input type="number" step="0.01" value={formData.extraCharges} onChange={(e) => setFormData({...formData, extraCharges: e.target.value})} className="w-full px-8 py-5 bg-slate-100 border-none rounded-[24px] text-xl font-black outline-none focus:ring-4 focus:ring-emerald-500/10 text-emerald-600 placeholder:text-slate-300" placeholder="0.00" />
                   </div>
                 )}
