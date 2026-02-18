@@ -11,6 +11,8 @@ const PASSWORDS = {
   RAVI: 'ravi2025'
 };
 
+const RAVI_PHONE = "94718010611";
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [costs, setCosts] = useState<DesignCost[]>([]);
@@ -68,25 +70,33 @@ const App: React.FC = () => {
       setCurrentUser({ role, name: 'Sanjaya', email: 'sanjaya@designer.com' });
     } else if (role === UserRole.RAVI && password === PASSWORDS.RAVI) {
       setCurrentUser({ role, name: 'Ravi', email: 'ravi2025@client.com' });
-      // Set default payment method for Ravi
       setFormData(prev => ({ ...prev, method: 'Sampath Bank' }));
     } else {
       alert("Invalid Password");
     }
   };
 
-  const addQuickButton = (label: string, amount: number) => {
-    const newBtn: QuickButton = { id: crypto.randomUUID(), label, amount, type: 'Design' };
-    const updated = [...managedQuickButtons, newBtn];
-    setManagedQuickButtons(updated);
-    storageService.saveQuickButtons(updated);
-  };
+  const sendWhatsAppUpdate = (description: string, newAmount: number, newExtra: number) => {
+    // Calculate new totals for the message
+    const currentTotalCosts = costs.reduce((acc, curr) => acc + (Number(curr.amount) || 0) + (Number(curr.extraCharges) || 0), 0);
+    const currentTotalPaid = payments.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    
+    const updatedTotalCosts = currentTotalCosts + newAmount + newExtra;
+    const updatedPending = updatedTotalCosts - currentTotalPaid;
 
-  const updateQuickButton = (id: string, label: string, amount: number) => {
-    const updated = managedQuickButtons.map(b => b.id === id ? { ...b, label, amount } : b);
-    setManagedQuickButtons(updated);
-    storageService.saveQuickButtons(updated);
-    setEditingPreset(null);
+    const message = `*Hello Ravi Aiya,* 👋\n\n` +
+                    `*New Recent Work:* ${description}\n` +
+                    `*Item Total:* Rs.${(newAmount + newExtra).toLocaleString()}\n\n` +
+                    `--- Project Summary ---\n` +
+                    `*Total Bill:* Rs.${updatedTotalCosts.toLocaleString()}\n` +
+                    `*Pending:* Rs.${updatedPending > 0 ? updatedPending.toLocaleString() : '0'}\n\n` +
+                    `*Please pay the pending balance as soon as possible. Thank you!* 🙏`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${RAVI_PHONE}?text=${encodedMessage}`;
+    
+    // Open WhatsApp in a new tab
+    window.open(whatsappUrl, '_blank');
   };
 
   const handleAddEntry = async (e: React.FormEvent) => {
@@ -97,7 +107,6 @@ const App: React.FC = () => {
     const extraNum = parseFloat(formData.extraCharges) || 0;
     if (isNaN(amountNum) || amountNum <= 0) return alert("Enter valid amount");
 
-    // Handle optional description defaults
     const finalDescription = formData.description.trim() || (currentUser.role === UserRole.SANJAYA ? "Design Work" : "Payment Settlement");
 
     if (currentUser.role === UserRole.SANJAYA) {
@@ -112,10 +121,16 @@ const App: React.FC = () => {
       };
       await storageService.saveCost(newCost, currentUser.email);
 
+      // Trigger WhatsApp Notification
+      sendWhatsAppUpdate(finalDescription, amountNum, extraNum);
+
       if (formData.saveAsPreset && formData.description.trim()) {
         const exists = managedQuickButtons.some(b => b.label.toLowerCase() === finalDescription.toLowerCase() && b.amount === amountNum);
         if (!exists) {
-          addQuickButton(finalDescription, amountNum);
+          const newBtn: QuickButton = { id: crypto.randomUUID(), label: finalDescription, amount: amountNum, type: 'Design' };
+          const updated = [...managedQuickButtons, newBtn];
+          setManagedQuickButtons(updated);
+          storageService.saveQuickButtons(updated);
         }
       }
     } else {
@@ -165,6 +180,14 @@ const App: React.FC = () => {
     setManagedQuickButtons(updated);
     storageService.saveQuickButtons(updated);
     if (editingPreset?.id === id) setEditingPreset(null);
+  };
+
+  // Fix: Added addQuickButton function to handle adding new presets from the manager
+  const addQuickButton = (label: string, amount: number) => {
+    const newBtn: QuickButton = { id: crypto.randomUUID(), label, amount, type: 'Design' };
+    const updated = [...managedQuickButtons, newBtn];
+    setManagedQuickButtons(updated);
+    storageService.saveQuickButtons(updated);
   };
 
   if (!currentUser) {
@@ -333,7 +356,14 @@ const App: React.FC = () => {
                     const label = (f.elements.namedItem('btn-label') as HTMLInputElement).value;
                     const amount = parseFloat((f.elements.namedItem('btn-amount') as HTMLInputElement).value);
                     if (label && amount > 0) {
-                      editingPreset ? updateQuickButton(editingPreset.id, label, amount) : addQuickButton(label, amount);
+                      if (editingPreset) {
+                        const updated = managedQuickButtons.map(b => b.id === editingPreset.id ? { ...b, label, amount } : b);
+                        setManagedQuickButtons(updated);
+                        storageService.saveQuickButtons(updated);
+                        setEditingPreset(null);
+                      } else {
+                        addQuickButton(label, amount);
+                      }
                       f.reset();
                     }
                   }}
