@@ -1,18 +1,29 @@
 
-import React from 'react';
-import { DesignCost, Payment, User } from '../types';
+import React, { useState } from 'react';
+import { DesignCost, Payment, User, UserRole } from '../types';
 
 interface HistoryListProps {
   costs: DesignCost[];
   payments: Payment[];
   onDelete: (id: string, type: 'COST' | 'PAYMENT') => void;
   currentUser: User;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
 }
 
-const HistoryList: React.FC<HistoryListProps> = ({ costs, payments, onDelete, currentUser }) => {
+const HistoryList: React.FC<HistoryListProps> = ({ 
+  costs, 
+  payments, 
+  onDelete, 
+  currentUser,
+  selectedIds = [],
+  onToggleSelect
+}) => {
+  const [showPayments, setShowPayments] = useState(currentUser.role !== UserRole.RAVI);
+
   const allItems = [
     ...costs.map(c => ({ ...c, itemType: 'COST' as const })),
-    ...payments.map(p => ({ ...p, itemType: 'PAYMENT' as const }))
+    ...(showPayments ? payments.map(p => ({ ...p, itemType: 'PAYMENT' as const })) : [])
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   if (allItems.length === 0) {
@@ -26,8 +37,20 @@ const HistoryList: React.FC<HistoryListProps> = ({ costs, payments, onDelete, cu
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recent Activity</h3>
-        <span className="text-[9px] text-slate-400 font-bold bg-white px-2 py-0.5 rounded-full border border-slate-100">{allItems.length}</span>
+        <div className="flex items-center gap-3">
+          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recent Activity</h3>
+          <span className="text-[9px] text-slate-400 font-bold bg-white px-2 py-0.5 rounded-full border border-slate-100">{allItems.length}</span>
+        </div>
+        <button 
+          onClick={() => setShowPayments(!showPayments)}
+          className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border transition-all ${
+            showPayments 
+              ? 'bg-indigo-50 text-indigo-600 border-indigo-100' 
+              : 'bg-slate-50 text-slate-400 border-slate-100'
+          }`}
+        >
+          {showPayments ? 'Hide Paid' : 'Show Paid'}
+        </button>
       </div>
       <div className="divide-y divide-slate-50">
         {allItems.map((item) => {
@@ -42,8 +65,25 @@ const HistoryList: React.FC<HistoryListProps> = ({ costs, payments, onDelete, cu
             : (rawItem.note || 'Payment');
           
           return (
-            <div key={item.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors active:bg-slate-100">
+            <div 
+              key={item.id} 
+              onClick={() => item.itemType === 'COST' && onToggleSelect && onToggleSelect(item.id)}
+              className={`p-3 flex items-center justify-between hover:bg-slate-50 transition-colors active:bg-slate-100 cursor-pointer ${
+                selectedIds.includes(item.id) ? 'bg-indigo-50/50 border-l-4 border-indigo-500' : ''
+              }`}
+            >
               <div className="flex items-center gap-3 overflow-hidden">
+                {item.itemType === 'COST' && onToggleSelect && (
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.includes(item.id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      onToggleSelect(item.id);
+                    }}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                  />
+                )}
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   item.itemType === 'COST' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
                 }`}>
@@ -73,7 +113,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ costs, payments, onDelete, cu
                 </div>
                 {(currentUser.role === 'SANJAYA' || (currentUser.role === 'RAVI' && item.itemType === 'PAYMENT' && isOwner)) && (
                   <button 
-                    onClick={() => onDelete(item.id, item.itemType)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(item.id, item.itemType);
+                    }}
                     className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

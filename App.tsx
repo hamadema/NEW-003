@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserRole, DesignCost, Payment, QuickButton } from './types';
 import { storageService } from './services/storageService';
 import Dashboard from './components/Dashboard';
@@ -10,8 +10,6 @@ const PASSWORDS = {
   SANJAYA: 'san1980',
   RAVI: 'ravi2025'
 };
-
-const RAVI_PHONE = "94718010611";
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -66,37 +64,54 @@ const App: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const { role, password } = loginState;
-    if (role === UserRole.SANJAYA && password === PASSWORDS.SANJAYA) {
-      setCurrentUser({ role, name: 'Sanjaya', email: 'sanjaya@designer.com' });
-    } else if (role === UserRole.RAVI && password === PASSWORDS.RAVI) {
+    if (role === UserRole.SANJAYA) {
+      if (password === PASSWORDS.SANJAYA) {
+        setCurrentUser({ role, name: 'Sanjaya', email: 'sanjaya@designer.com' });
+      } else {
+        alert("Invalid Password");
+      }
+    } else if (role === UserRole.RAVI) {
+      // Ravi password removed as requested
       setCurrentUser({ role, name: 'Ravi', email: 'ravi2025@client.com' });
       setFormData(prev => ({ ...prev, method: 'Sampath Bank' }));
-    } else {
-      alert("Invalid Password");
     }
   };
 
-  const sendWhatsAppUpdate = (description: string, newAmount: number, newExtra: number) => {
-    // Calculate new totals for the message
-    const currentTotalCosts = costs.reduce((acc, curr) => acc + (Number(curr.amount) || 0) + (Number(curr.extraCharges) || 0), 0);
-    const currentTotalPaid = payments.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-    
-    const updatedTotalCosts = currentTotalCosts + newAmount + newExtra;
-    const updatedPending = updatedTotalCosts - currentTotalPaid;
+  const addQuickButton = (label: string, amount: number) => {
+    const newBtn: QuickButton = { id: crypto.randomUUID(), label, amount, type: 'Design' };
+    const updated = [...managedQuickButtons, newBtn];
+    setManagedQuickButtons(updated);
+    storageService.saveQuickButtons(updated);
+  };
 
-    const message = `*Hello Ravi Aiya,* 👋\n\n` +
-                    `*New Recent Work:* ${description}\n` +
-                    `*Item Total:* Rs.${(newAmount + newExtra).toLocaleString()}\n\n` +
-                    `--- Project Summary ---\n` +
-                    `*Total Bill:* Rs.${updatedTotalCosts.toLocaleString()}\n` +
-                    `*Pending:* Rs.${updatedPending > 0 ? updatedPending.toLocaleString() : '0'}\n\n` +
-                    `*Please pay the pending balance as soon as possible. Thank you!* 🙏`;
+  const updateQuickButton = (id: string, label: string, amount: number) => {
+    const updated = managedQuickButtons.map(b => b.id === id ? { ...b, label, amount } : b);
+    setManagedQuickButtons(updated);
+    storageService.saveQuickButtons(updated);
+    setEditingPreset(null);
+  };
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${RAVI_PHONE}?text=${encodedMessage}`;
-    
-    // Open WhatsApp in a new tab
-    window.open(whatsappUrl, '_blank');
+  const [selectedCostIds, setSelectedCostIds] = useState<string[]>([]);
+
+  const totalCosts = useMemo(() => 
+    costs.reduce((acc, curr) => acc + (Number(curr.amount) || 0) + (Number(curr.extraCharges) || 0), 0)
+  , [costs]);
+  
+  const totalPaid = useMemo(() => 
+    payments.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+  , [payments]);
+
+  const currentBalance = Math.max(0, totalCosts - totalPaid);
+
+  const selectedTotal = useMemo(() => 
+    costs
+      .filter(c => selectedCostIds.includes(c.id))
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0) + (Number(curr.extraCharges) || 0), 0)
+  , [costs, selectedCostIds]);
+
+  const sendWhatsApp = (to: string, message: string) => {
+    const url = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const handleAddEntry = async (e: React.FormEvent) => {
@@ -107,6 +122,7 @@ const App: React.FC = () => {
     const extraNum = parseFloat(formData.extraCharges) || 0;
     if (isNaN(amountNum) || amountNum <= 0) return alert("Enter valid amount");
 
+    // Handle optional description defaults
     const finalDescription = formData.description.trim() || (currentUser.role === UserRole.SANJAYA ? "Design Work" : "Payment Settlement");
 
     if (currentUser.role === UserRole.SANJAYA) {
@@ -121,16 +137,18 @@ const App: React.FC = () => {
       };
       await storageService.saveCost(newCost, currentUser.email);
 
-      // Trigger WhatsApp Notification
-      sendWhatsAppUpdate(finalDescription, amountNum, extraNum);
+      // Calculate updated totals for the message
+      const newTotalCosts = totalCosts + amountNum + extraNum;
+      const newBalance = newTotalCosts - totalPaid;
+
+      // WhatsApp to Ravi
+      const msg = `Hello Ravi Aiya, 👋\n\nNew Recent Work: ${finalDescription}\nItem Total: Rs.${(amountNum + extraNum).toLocaleString()}\n\n--- Project Summary ---\nTotal Bill: Rs.${newTotalCosts.toLocaleString()}\n*Pending: Rs.${Math.max(0, newBalance).toLocaleString()}*\n\nPlease pay the pending balance as soon as possible. Thank you! 🙏`;
+      sendWhatsApp('940718010611', msg);
 
       if (formData.saveAsPreset && formData.description.trim()) {
         const exists = managedQuickButtons.some(b => b.label.toLowerCase() === finalDescription.toLowerCase() && b.amount === amountNum);
         if (!exists) {
-          const newBtn: QuickButton = { id: crypto.randomUUID(), label: finalDescription, amount: amountNum, type: 'Design' };
-          const updated = [...managedQuickButtons, newBtn];
-          setManagedQuickButtons(updated);
-          storageService.saveQuickButtons(updated);
+          addQuickButton(finalDescription, amountNum);
         }
       }
     } else {
@@ -143,6 +161,17 @@ const App: React.FC = () => {
         addedBy: currentUser.name
       };
       await storageService.savePayment(newPayment, currentUser.email);
+
+      // Calculate updated totals for the message
+      const newTotalPaid = totalPaid + amountNum;
+      const newBalance = totalCosts - newTotalPaid;
+
+      // WhatsApp to Sanjaya
+      const msg = `Hello Sanjaya, 👋\n\nNew Payment: ${finalDescription}\nAmount: Rs.${amountNum.toLocaleString()}\n\n--- Project Summary ---\nTotal Bill: Rs.${totalCosts.toLocaleString()}\n*Pending: Rs.${Math.max(0, newBalance).toLocaleString()}*\n\nThank you! 🙏`;
+      sendWhatsApp('94777961841', msg);
+      
+      // Clear selected costs after payment
+      setSelectedCostIds([]);
     }
 
     setIsAddModalOpen(false);
@@ -182,14 +211,6 @@ const App: React.FC = () => {
     if (editingPreset?.id === id) setEditingPreset(null);
   };
 
-  // Fix: Added addQuickButton function to handle adding new presets from the manager
-  const addQuickButton = (label: string, amount: number) => {
-    const newBtn: QuickButton = { id: crypto.randomUUID(), label, amount, type: 'Design' };
-    const updated = [...managedQuickButtons, newBtn];
-    setManagedQuickButtons(updated);
-    storageService.saveQuickButtons(updated);
-  };
-
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -221,15 +242,19 @@ const App: React.FC = () => {
 
               {loginState.role !== UserRole.NONE && (
                 <div className="animate-in fade-in slide-in-from-top-2">
-                  <input 
-                    type="password"
-                    required
-                    autoFocus
-                    placeholder="Enter Secret Key"
-                    value={loginState.password}
-                    onChange={(e) => setLoginState({ ...loginState, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-lg"
-                  />
+                  {loginState.role === UserRole.SANJAYA ? (
+                    <input 
+                      type="password"
+                      required
+                      autoFocus
+                      placeholder="Enter Secret Key"
+                      value={loginState.password}
+                      onChange={(e) => setLoginState({ ...loginState, password: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-center font-bold text-lg"
+                    />
+                  ) : (
+                    <div className="py-4 text-slate-500 text-xs font-medium">No password required for Ravi</div>
+                  )}
                   <button type="submit" className={`w-full mt-4 py-3 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 ${loginState.role === UserRole.SANJAYA ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
                     Open Workspace
                   </button>
@@ -274,7 +299,39 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-4">
-        <Dashboard costs={costs} payments={payments} userRole={currentUser.role} onLogPaymentClick={() => setIsAddModalOpen(true)} />
+        <Dashboard 
+          costs={costs} 
+          payments={payments} 
+          userRole={currentUser.role} 
+          onLogPaymentClick={(amount?: number) => {
+            if (amount !== undefined) {
+              setFormData(prev => ({ ...prev, amount: amount.toString() }));
+            }
+            setIsAddModalOpen(true);
+          }} 
+        />
+
+        {currentUser.role === UserRole.RAVI && (
+          <div className="bg-indigo-600 text-white p-6 rounded-3xl shadow-xl flex justify-between items-center animate-in slide-in-from-right-4">
+            <button 
+              onClick={() => {
+                if (selectedTotal > 0) {
+                  setFormData(prev => ({ ...prev, amount: selectedTotal.toString() }));
+                  setIsAddModalOpen(true);
+                } else {
+                  alert("Please select at least one item from the list below to pay.");
+                }
+              }}
+              className={`bg-white text-indigo-600 px-6 py-3 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all uppercase ${selectedTotal === 0 ? 'opacity-50' : ''}`}
+            >
+              Pay Selected
+            </button>
+            <div className="text-right">
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Selected for Payment</p>
+              <h2 className="text-4xl font-black tracking-tighter">Rs.{selectedTotal.toLocaleString()}</h2>
+            </div>
+          </div>
+        )}
 
         {currentUser.role === UserRole.SANJAYA && (
           <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
@@ -306,7 +363,18 @@ const App: React.FC = () => {
         )}
 
         <div className="space-y-2">
-          <HistoryList costs={costs} payments={payments} onDelete={handleDelete} currentUser={currentUser} />
+          <HistoryList 
+            costs={costs} 
+            payments={payments} 
+            onDelete={handleDelete} 
+            currentUser={currentUser}
+            selectedIds={selectedCostIds}
+            onToggleSelect={(id) => {
+              setSelectedCostIds(prev => 
+                prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+              );
+            }}
+          />
         </div>
       </main>
 
@@ -356,14 +424,7 @@ const App: React.FC = () => {
                     const label = (f.elements.namedItem('btn-label') as HTMLInputElement).value;
                     const amount = parseFloat((f.elements.namedItem('btn-amount') as HTMLInputElement).value);
                     if (label && amount > 0) {
-                      if (editingPreset) {
-                        const updated = managedQuickButtons.map(b => b.id === editingPreset.id ? { ...b, label, amount } : b);
-                        setManagedQuickButtons(updated);
-                        storageService.saveQuickButtons(updated);
-                        setEditingPreset(null);
-                      } else {
-                        addQuickButton(label, amount);
-                      }
+                      editingPreset ? updateQuickButton(editingPreset.id, label, amount) : addQuickButton(label, amount);
                       f.reset();
                     }
                   }}

@@ -8,6 +8,8 @@ const KEYS = {
   GAS_URL: 'ledger_gas_url'
 };
 
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyb9fsCsTGsgt362lu4sKmIACf9SuyU_vLUDsXoJx6IvGnZHkdKnfCmk1D68cZevJXSgg/exec";
+
 const DEFAULT_BUTTONS: QuickButton[] = [
   { id: '1', label: 'Photo Retouch', amount: 300, type: 'Retouch' },
   { id: '2', label: 'Logo Design', amount: 1500, type: 'Branding' },
@@ -33,11 +35,15 @@ const sanitizeRemoteItems = (items: any[]) => {
     
     const description = raw.description || raw.desc || raw.work || raw.note || raw.item || 'New Entry';
     const note = raw.note || raw.description || raw.desc || 'Log Entry';
+    const date = raw.date || new Date().toISOString();
     
+    // Create a stable ID if none exists to prevent deselection on refresh
+    const stableId = raw.id || `${date}-${amount}-${description}`.replace(/\s+/g, '-');
+
     return {
       ...raw,
-      id: raw.id || crypto.randomUUID(),
-      date: raw.date || new Date().toISOString(),
+      id: stableId,
+      date,
       amount,
       extraCharges,
       addedBy,
@@ -50,7 +56,7 @@ const sanitizeRemoteItems = (items: any[]) => {
 };
 
 export const storageService = {
-  getGasUrl: (): string => localStorage.getItem(KEYS.GAS_URL) || '',
+  getGasUrl: (): string => localStorage.getItem(KEYS.GAS_URL) || DEFAULT_GAS_URL,
   setGasUrl: (url: string) => localStorage.setItem(KEYS.GAS_URL, url),
 
   getCosts: async (): Promise<DesignCost[]> => {
