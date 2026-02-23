@@ -44,7 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ costs, payments, userRole, onLogP
               onClick={onLogPaymentClick} 
               className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black shadow-lg shadow-indigo-200 transition-all active:scale-95 uppercase tracking-wider flex items-center gap-1.5"
             >
-              <Icons.Wallet /> Full pay
+              <Icons.Wallet /> Pay
             </button>
           )}
         </div>

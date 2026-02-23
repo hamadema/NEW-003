@@ -50,66 +50,18 @@ const sanitizeRemoteItems = (items: any[]) => {
 };
 
 export const storageService = {
-  getGasUrl: (): string => (localStorage.getItem(KEYS.GAS_URL) || '').trim(),
-  setGasUrl: (url: string) => localStorage.setItem(KEYS.GAS_URL, url.trim()),
-
-  testConnection: async (url: string): Promise<{ success: boolean; message: string }> => {
-    const trimmedUrl = url.trim();
-    if (!trimmedUrl) return { success: false, message: "URL is empty" };
-    if (!trimmedUrl.startsWith('https://script.google.com/')) return { success: false, message: "Invalid GAS URL format" };
-    
-    try {
-      const res = await fetch(trimmedUrl, { 
-        method: 'GET', 
-        cache: 'no-store',
-        mode: 'cors'
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'success' || data.costs || data.payments) {
-          return { success: true, message: "Connection established successfully!" };
-        }
-        return { success: false, message: "Connected, but received unexpected data format." };
-      }
-      
-      if (res.status === 403) {
-        return { success: false, message: "403 Forbidden: Ensure script is deployed as 'Anyone'." };
-      }
-      
-      return { success: false, message: `HTTP Error ${res.status}` };
-    } catch (e: any) {
-      return { success: false, message: "Network error. Check URL or CORS settings." };
-    }
-  },
+  getGasUrl: (): string => localStorage.getItem(KEYS.GAS_URL) || '',
+  setGasUrl: (url: string) => localStorage.setItem(KEYS.GAS_URL, url),
 
   getCosts: async (): Promise<DesignCost[]> => {
     const gasUrl = storageService.getGasUrl();
     if (gasUrl) {
       try {
-        const res = await fetch(gasUrl, { 
-          method: 'GET', 
-          cache: 'no-store',
-          mode: 'cors'
-        });
-        
-        if (!res.ok) {
-          if (res.status === 403) {
-            console.error("403 Forbidden: Google Apps Script permission denied. Ensure it is deployed as 'Anyone'.");
-          }
-          throw new Error(`HTTP ${res.status}`);
-        }
-        
-        const text = await res.text();
-        try {
-          const data = JSON.parse(text);
-          return sanitizeRemoteItems(data.costs || []);
-        } catch (parseError) {
-          console.error("Failed to parse GAS response as JSON. Received:", text.substring(0, 200));
-          throw new Error("Invalid response format from Cloud Link");
-        }
-      } catch (e: any) {
-        console.warn("Sync failed, check GAS URL or permissions", e.message || e);
+        const res = await fetch(gasUrl, { method: 'GET', cache: 'no-store' });
+        const data = await res.json();
+        return sanitizeRemoteItems(data.costs || []);
+      } catch (e) {
+        console.warn("Sync failed, check GAS URL", e);
       }
     }
     const data = localStorage.getItem(KEYS.COSTS);
@@ -157,30 +109,10 @@ export const storageService = {
     const gasUrl = storageService.getGasUrl();
     if (gasUrl) {
       try {
-        const res = await fetch(gasUrl, { 
-          method: 'GET', 
-          cache: 'no-store',
-          mode: 'cors'
-        });
-
-        if (!res.ok) {
-          if (res.status === 403) {
-            console.error("403 Forbidden: Google Apps Script permission denied.");
-          }
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const text = await res.text();
-        try {
-          const data = JSON.parse(text);
-          return sanitizeRemoteItems(data.payments || []);
-        } catch (parseError) {
-          console.error("Failed to parse GAS response as JSON. Received:", text.substring(0, 200));
-          throw new Error("Invalid response format from Cloud Link");
-        }
-      } catch (e: any) {
-        console.warn("Sync failed, check GAS URL or permissions", e.message || e);
-      }
+        const res = await fetch(gasUrl, { method: 'GET', cache: 'no-store' });
+        const data = await res.json();
+        return sanitizeRemoteItems(data.payments || []);
+      } catch (e) { console.warn("Sync failed", e); }
     }
     const data = localStorage.getItem(KEYS.PAYMENTS);
     return data ? sanitizeRemoteItems(JSON.parse(data)) : [];
